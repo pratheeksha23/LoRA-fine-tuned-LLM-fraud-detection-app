@@ -1,5 +1,6 @@
 import streamlit as st
-from huggingface_hub import InferenceClient
+import torch
+from transformers import pipeline
 
 st.set_page_config(
     page_title="SentinelAI - Financial Risk Intelligence",
@@ -10,8 +11,18 @@ st.set_page_config(
 st.title("💳 SentinelAI: Real-Time Transaction Risk Engine")
 st.caption("Context-Aware LLM Guardrails • Powered by Qwen-2.5-1.5B-Instruct")
 
-# Free serverless inference client
-client = InferenceClient(model="Qwen/Qwen2.5-1.5B-Instruct")
+
+@st.cache_resource
+def load_pipeline():
+    return pipeline(
+        "text-generation",
+        model="Qwen/Qwen2.5-1.5B-Instruct",
+        torch_dtype=torch.float32,
+        device_map="cpu",
+    )
+
+
+pipe = load_pipeline()
 
 col1, col2 = st.columns([1.1, 1])
 
@@ -119,12 +130,12 @@ with col2:
                 },
             ]
 
-            response = client.chat.completions.create(
-                messages=messages,
-                max_tokens=100,
-                temperature=0.1,
+            output = pipe(
+                messages,
+                max_new_tokens=80,
+                do_sample=False,
             )
-            raw_output = response.choices[0].message.content.strip()
+            raw_output = output[0]["generated_text"][-1]["content"].strip()
 
             is_fraud = "label: fraud" in raw_output.lower() or (
                 "fraud" in raw_output.lower() and "not fraud" not in raw_output.lower()
