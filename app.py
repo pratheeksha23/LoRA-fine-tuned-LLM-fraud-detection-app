@@ -1,7 +1,5 @@
 import streamlit as st
-import torch
-from peft import PeftModel
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from huggingface_hub import InferenceClient
 
 st.set_page_config(
     page_title="SentinelAI - Financial Risk Intelligence",
@@ -10,44 +8,10 @@ st.set_page_config(
 )
 
 st.title("💳 SentinelAI: Real-Time Transaction Risk Engine")
-st.caption("Context-Aware LLM Guardrails • Powered by Qwen-2.5-1.5B + LoRA Adapter")
+st.caption("Context-Aware LLM Guardrails • Powered by Qwen-2.5-1.5B-Instruct")
 
-
-@st.cache_resource
-def load_model():
-    base_model_name = "Qwen/Qwen2.5-1.5B-Instruct"
-    adapter_repo = "YOUR_HF_USERNAME/fraud-lora-adapter"
-
-    tokenizer = AutoTokenizer.from_pretrained(
-        base_model_name, trust_remote_code=True
-    )
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.float16,
-        bnb_4bit_use_double_quant=True,
-    )
-
-    base_model = AutoModelForCausalLM.from_pretrained(
-        base_model_name,
-        quantization_config=bnb_config,
-        device_map="auto",
-        torch_dtype=torch.float16,
-        trust_remote_code=True,
-    )
-
-    model = PeftModel.from_pretrained(base_model, adapter_repo)
-    model.eval()
-    if hasattr(model, "gradient_checkpointing_disable"):
-        model.gradient_checkpointing_disable()
-    model.config.use_cache = True
-    return tokenizer, model
-
-
-tokenizer, model = load_model()
+# Free serverless inference client
+client = InferenceClient(model="Qwen/Qwen2.5-1.5B-Instruct")
 
 col1, col2 = st.columns([1.1, 1])
 
@@ -130,7 +94,7 @@ with col2:
         st.write(constructed_narrative)
 
     if analyze_btn:
-        with st.spinner("Processing fraud heuristics & neural weights..."):
+        with st.spinner("Processing fraud heuristics & telemetry..."):
             system_prompt = (
                 "You are an expert fraud risk auditor for a premier bank. Analyze the complete context:\n"
                 "- Emergency transfers, family support, groceries, utility bills, or small late-night spends on a trusted device are NOT FRAUD.\n"
@@ -155,17 +119,13 @@ with col2:
                 },
             ]
 
-            prompt_text = tokenizer.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True
+            response = client.chat.completions.create(
+                messages=messages,
+                max_tokens=100,
+                temperature=0.1,
             )
-            inputs = tokenizer([prompt_text], return_tensors="pt").to(model.device)
+            raw_output = response.choices[0].message.content.strip()
 
-            with torch.no_grad():
-                outputs = model.generate(**inputs, max_new_tokens=90, do_sample=False)
-
-            raw_output = tokenizer.decode(
-                outputs[0][inputs.input_ids.shape[1] :], skip_special_tokens=True
-            ).strip()
             is_fraud = "label: fraud" in raw_output.lower() or (
                 "fraud" in raw_output.lower() and "not fraud" not in raw_output.lower()
             )
