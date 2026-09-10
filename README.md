@@ -1,5 +1,6 @@
 # SentinelAI: FRAUD DETECTION APP
-https://github.com/user-attachments/assets/6741bc99-b565-4a00-903e-7527779bec96
+
+https://github.com/user-attachments/assets/f9e2e914-4395-404e-825c-c78dea8d82da
 
 SentinelAI is a lightweight, context-aware financial fraud risk intelligence engine designed to detect unauthorized account takeovers, credential compromise, and fraudulent money-diversion patterns in real time.
 
